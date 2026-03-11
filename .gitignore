@@ -1,0 +1,22 @@
+# 打包輸出
+dist/
+build/
+*.spec
+
+# 使用者資料
+data/
+
+# 中間產物
+app_256.png
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+*.local

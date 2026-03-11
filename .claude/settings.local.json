@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm list:*)",
+      "Bash(netstat -ano | grep 5588 2>/dev/null || echo \"Port 5588 is free\")"
+    ]
+  }
+}
