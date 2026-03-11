@@ -7,6 +7,7 @@ let activeTagFilter = null;
 let composeTemplate = null;
 let composeEdited = false;
 let tagSuggestHideTimer = null;
+let tagSuggestActiveIndex = -1;
 
 const API = '/api';
 
@@ -14,14 +15,16 @@ const API = '/api';
 document.addEventListener('DOMContentLoaded', () => {
   loadTemplates();
   setupBodyDropZone();
-  startHeartbeat();
+  setupShutdownOnClose();
+  loadA11ySettings();
+  setupKeyboardShortcuts();
 });
 
-/* === 心跳：通知伺服器瀏覽器仍開啟 === */
-function startHeartbeat() {
-  const ping = () => fetch(`${API}/heartbeat`, { method: 'POST' }).catch(() => {});
-  ping();
-  setInterval(ping, 5000);
+/* === 關閉偵測：視窗關閉時通知伺服器結束 === */
+function setupShutdownOnClose() {
+  window.addEventListener('beforeunload', () => {
+    navigator.sendBeacon(`${API}/shutdown`);
+  });
 }
 
 async function loadTemplates() {
@@ -284,8 +287,37 @@ function renderEditorTags() {
 }
 
 function handleTagKey(e) {
+  const items = document.querySelectorAll('.tag-suggestion-item');
+  const hasSuggestions = items.length > 0 && !document.getElementById('tag-suggestions').classList.contains('hidden');
+
+  if (e.key === 'ArrowDown') {
+    if (!hasSuggestions) return;
+    e.preventDefault();
+    tagSuggestActiveIndex = Math.min(tagSuggestActiveIndex + 1, items.length - 1);
+    highlightTagSuggestion(items);
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    if (!hasSuggestions) return;
+    e.preventDefault();
+    tagSuggestActiveIndex = Math.max(tagSuggestActiveIndex - 1, -1);
+    highlightTagSuggestion(items);
+    return;
+  }
+  if (e.key === 'Tab') {
+    if (!hasSuggestions) return;
+    e.preventDefault();
+    const idx = tagSuggestActiveIndex >= 0 ? tagSuggestActiveIndex : 0;
+    const tag = items[idx]?.dataset.tag;
+    if (tag) selectTagSuggestion(tag);
+    return;
+  }
   if (e.key === 'Enter') {
     e.preventDefault();
+    if (hasSuggestions && tagSuggestActiveIndex >= 0) {
+      const tag = items[tagSuggestActiveIndex]?.dataset.tag;
+      if (tag) { selectTagSuggestion(tag); return; }
+    }
     const input = document.getElementById('tpl-tag-input');
     const tag = input.value.trim();
     if (tag && !editorTags.includes(tag)) {
@@ -295,6 +327,13 @@ function handleTagKey(e) {
     input.value = '';
     hideTagSuggestions();
   }
+}
+
+function highlightTagSuggestion(items) {
+  items.forEach((item, i) => {
+    item.classList.toggle('active', i === tagSuggestActiveIndex);
+    if (i === tagSuggestActiveIndex) item.scrollIntoView({ block: 'nearest' });
+  });
 }
 
 function removeEditorTag(index) {
@@ -330,13 +369,14 @@ function showTagSuggestions() {
     return;
   }
 
+  tagSuggestActiveIndex = -1;
   container.innerHTML = suggestions.map(tag => {
     // 高亮匹配部分
     const idx = tag.toLowerCase().indexOf(query);
     const before = tag.substring(0, idx);
     const match = tag.substring(idx, idx + query.length);
     const after = tag.substring(idx + query.length);
-    return `<div class="tag-suggestion-item" onmousedown="selectTagSuggestion('${escAttr(tag)}')">${escHtml(before)}<span class="match-highlight">${escHtml(match)}</span>${escHtml(after)}</div>`;
+    return `<div class="tag-suggestion-item" data-tag="${escAttr(tag)}" onmousedown="selectTagSuggestion('${escAttr(tag)}')">${escHtml(before)}<span class="match-highlight">${escHtml(match)}</span>${escHtml(after)}</div>`;
   }).join('');
 
   container.classList.remove('hidden');
@@ -353,6 +393,7 @@ function selectTagSuggestion(tag) {
 
 function hideTagSuggestions() {
   document.getElementById('tag-suggestions').classList.add('hidden');
+  tagSuggestActiveIndex = -1;
 }
 
 function hideTagSuggestionsDelay() {
@@ -546,4 +587,172 @@ function showToast(message) {
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2500);
+}
+
+/* ============================================================
+   無障礙設定
+   ============================================================ */
+
+function loadA11ySettings() {
+  const fontSize = localStorage.getItem('a11y-font-size') || 'normal';
+  const highContrast = localStorage.getItem('a11y-high-contrast') === 'true';
+  const reduceMotion = localStorage.getItem('a11y-reduce-motion') === 'true';
+  applyFontSize(fontSize);
+  applyHighContrast(highContrast);
+  applyReduceMotion(reduceMotion);
+  document.querySelectorAll('.font-size-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.size === fontSize);
+  });
+  document.getElementById('high-contrast-toggle').checked = highContrast;
+  document.getElementById('reduce-motion-toggle').checked = reduceMotion;
+}
+
+function applyFontSize(size) {
+  document.documentElement.classList.remove('font-small', 'font-large');
+  if (size !== 'normal') document.documentElement.classList.add(`font-${size}`);
+}
+
+function setFontSize(size) {
+  applyFontSize(size);
+  localStorage.setItem('a11y-font-size', size);
+  document.querySelectorAll('.font-size-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.size === size);
+  });
+}
+
+function applyHighContrast(enabled) {
+  document.body.classList.toggle('high-contrast', enabled);
+}
+
+function setHighContrast(enabled) {
+  applyHighContrast(enabled);
+  localStorage.setItem('a11y-high-contrast', enabled);
+}
+
+function applyReduceMotion(enabled) {
+  document.body.classList.toggle('reduce-motion', enabled);
+}
+
+function setReduceMotion(enabled) {
+  applyReduceMotion(enabled);
+  localStorage.setItem('a11y-reduce-motion', enabled);
+}
+
+function toggleA11yPanel() {
+  document.getElementById('a11y-panel').classList.toggle('hidden');
+}
+
+/* ============================================================
+   快捷鍵說明 Modal
+   ============================================================ */
+
+function openShortcutModal() {
+  document.getElementById('a11y-panel').classList.add('hidden');
+  document.getElementById('shortcut-modal').classList.remove('hidden');
+}
+
+function closeShortcutModal() {
+  document.getElementById('shortcut-modal').classList.add('hidden');
+}
+
+/* ============================================================
+   鍵盤快捷鍵
+   ============================================================ */
+
+function isTyping() {
+  const el = document.activeElement;
+  return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+}
+
+function getCurrentView() {
+  return document.querySelector('.toggle-btn.active')?.dataset.view;
+}
+
+function isComposePanelOpen() {
+  return !document.getElementById('compose-panel').classList.contains('hidden');
+}
+
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Alt+1: 使用頁面
+    if (e.altKey && e.key === '1') {
+      e.preventDefault();
+      switchView('generate');
+      return;
+    }
+    // Alt+2: 編輯頁面
+    if (e.altKey && e.key === '2') {
+      e.preventDefault();
+      switchView('editor');
+      return;
+    }
+    // Alt+A: 無障礙設定
+    if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      toggleA11yPanel();
+      return;
+    }
+    // Ctrl+S: 儲存模板（編輯模式）
+    if (e.ctrlKey && e.key === 's') {
+      if (getCurrentView() === 'editor') {
+        e.preventDefault();
+        saveTemplate();
+      }
+      return;
+    }
+    // Ctrl+N: 新增模板（編輯模式）
+    if (e.ctrlKey && e.key === 'n') {
+      if (getCurrentView() === 'editor') {
+        e.preventDefault();
+        newTemplate();
+      }
+      return;
+    }
+    // Ctrl+Enter: 複製信件內容（預覽面板開啟時）
+    if (e.ctrlKey && e.key === 'Enter') {
+      if (isComposePanelOpen()) {
+        e.preventDefault();
+        copyEmail();
+      }
+      return;
+    }
+    // 以下快捷鍵：輸入中不觸發
+    if (isTyping()) return;
+    // /: 聚焦搜尋框
+    if (e.key === '/' && getCurrentView() === 'generate' && !isComposePanelOpen()) {
+      e.preventDefault();
+      document.getElementById('search-input').focus();
+      return;
+    }
+    // Esc: 依序關閉面板
+    if (e.key === 'Escape') {
+      if (!document.getElementById('shortcut-modal').classList.contains('hidden')) {
+        closeShortcutModal();
+        return;
+      }
+      if (!document.getElementById('a11y-panel').classList.contains('hidden')) {
+        document.getElementById('a11y-panel').classList.add('hidden');
+        return;
+      }
+      if (isComposePanelOpen()) {
+        closeCompose();
+        return;
+      }
+      return;
+    }
+    // ?: 快捷鍵說明
+    if (e.key === '?') {
+      openShortcutModal();
+      return;
+    }
+  });
+
+  // 點擊無障礙面板外部時關閉
+  document.addEventListener('click', (e) => {
+    const panel = document.getElementById('a11y-panel');
+    const btn = document.getElementById('a11y-toggle-btn');
+    if (!panel.classList.contains('hidden') && !panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.classList.add('hidden');
+    }
+  });
 }

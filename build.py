@@ -7,7 +7,7 @@ base = os.path.dirname(os.path.abspath(__file__))
 PyInstaller.__main__.run([
     os.path.join(base, 'app.py'),
     '--onefile',
-    '--name', '訊息模板小工具',
+    '--name', 'MessageTemplator',
     '--icon', os.path.join(base, 'app.ico'),
     '--add-data', f'{os.path.join(base, "static")};static',
     '--noconsole',

@@ -1,10 +1,9 @@
-"""訊息模板小工具 - Flask Backend"""
+"""MessageTemplator - Flask Backend"""
 import json
 import uuid
 import os
 import sys
 import signal
-import time
 import threading
 import webbrowser
 from datetime import datetime
@@ -118,37 +117,18 @@ def get_tags():
     return jsonify(tags)
 
 
-# --- 心跳機制：瀏覽器關閉後自動結束伺服器 ---
-last_heartbeat = time.time()
-HEARTBEAT_TIMEOUT = 10  # 秒，超過此時間未收到心跳則關閉
-
-
-@app.route('/api/heartbeat', methods=['POST'])
-def heartbeat():
-    global last_heartbeat
-    last_heartbeat = time.time()
+# --- 關閉伺服器：瀏覽器視窗關閉時呼叫 ---
+@app.route('/api/shutdown', methods=['POST'])
+def shutdown():
+    print('瀏覽器視窗已關閉，伺服器自動結束。')
+    threading.Thread(target=lambda: os.kill(os.getpid(), signal.SIGINT), daemon=True).start()
     return jsonify({'ok': True})
-
-
-def watchdog():
-    """背景執行緒，偵測心跳逾時後關閉伺服器"""
-    global last_heartbeat
-    while True:
-        time.sleep(3)
-        if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT:
-            print('瀏覽器已關閉，伺服器自動結束。')
-            # 用 SIGINT 優雅關閉，讓 PyInstaller 正常清理暫存目錄
-            os.kill(os.getpid(), signal.SIGINT)
 
 
 if __name__ == '__main__':
     ensure_data_dir()
     port = 5588
-    print(f'訊息模板小工具啟動中... http://localhost:{port}')
-
-    # 啟動心跳監控
-    t = threading.Thread(target=watchdog, daemon=True)
-    t.start()
+    print(f'MessageTemplator 啟動中... http://localhost:{port}')
 
     webbrowser.open(f'http://localhost:{port}')
     app.run(host='127.0.0.1', port=port, debug=False)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>訊息模板小工具</title>
+  <title>MessageTemplator</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="icon" type="image/png" sizes="256x256" href="/static/favicon.png">
   <link rel="stylesheet" href="/static/style.css">
@@ -11,16 +11,52 @@
 <body>
   <div class="header-wrap">
     <header>
-      <h1>訊息模板小工具</h1>
-      <div class="mode-toggle">
-        <button class="toggle-btn active" data-view="generate" onclick="switchView('generate')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-          使用
-        </button>
-        <button class="toggle-btn" data-view="editor" onclick="switchView('editor')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          編輯
-        </button>
+      <h1>MessageTemplator</h1>
+      <div class="header-right">
+        <div class="mode-toggle">
+          <button class="toggle-btn active" data-view="generate" onclick="switchView('generate')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+            使用
+          </button>
+          <button class="toggle-btn" data-view="editor" onclick="switchView('editor')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            編輯
+          </button>
+        </div>
+        <div class="a11y-wrap">
+          <button class="a11y-btn" id="a11y-toggle-btn" onclick="toggleA11yPanel()" title="無障礙設定 (Alt+A)" aria-label="無障礙設定">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          </button>
+          <div id="a11y-panel" class="a11y-panel hidden" role="dialog" aria-label="無障礙設定">
+            <div class="a11y-panel-header">
+              <span>無障礙設定</span>
+              <button class="a11y-close-btn" onclick="toggleA11yPanel()" aria-label="關閉">&#215;</button>
+            </div>
+            <div class="a11y-section">
+              <div class="a11y-label">字型大小</div>
+              <div class="font-size-btns">
+                <button class="font-size-btn" data-size="small" onclick="setFontSize('small')">小</button>
+                <button class="font-size-btn" data-size="normal" onclick="setFontSize('normal')">標準</button>
+                <button class="font-size-btn" data-size="large" onclick="setFontSize('large')">大</button>
+              </div>
+            </div>
+            <div class="a11y-section">
+              <label class="a11y-toggle-row">
+                <span class="a11y-label">高對比模式</span>
+                <input type="checkbox" id="high-contrast-toggle" onchange="setHighContrast(this.checked)">
+              </label>
+            </div>
+            <div class="a11y-section">
+              <label class="a11y-toggle-row">
+                <span class="a11y-label">減少動態效果</span>
+                <input type="checkbox" id="reduce-motion-toggle" onchange="setReduceMotion(this.checked)">
+              </label>
+            </div>
+            <div class="a11y-section">
+              <button class="btn btn-sm" style="width:100%;text-align:center" onclick="openShortcutModal()">鍵盤快捷鍵說明 &nbsp;<kbd>?</kbd></button>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
   </div>
@@ -97,5 +133,39 @@
   </footer>
 
   <script src="/static/app.js"></script>
+
+  <!-- 快捷鍵說明 -->
+  <div id="shortcut-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="鍵盤快捷鍵" onclick="closeShortcutModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <strong>鍵盤快捷鍵</strong>
+        <button class="a11y-close-btn" onclick="closeShortcutModal()" aria-label="關閉">&#215;</button>
+      </div>
+      <div class="shortcut-list">
+        <div class="shortcut-group">
+          <div class="shortcut-group-title">頁面切換</div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Alt</kbd>+<kbd>1</kbd></div><span>切換到「使用」頁面</span></div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Alt</kbd>+<kbd>2</kbd></div><span>切換到「編輯」頁面</span></div>
+        </div>
+        <div class="shortcut-group">
+          <div class="shortcut-group-title">使用頁面</div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>/</kbd></div><span>聚焦搜尋框</span></div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></div><span>複製信件內容</span></div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Esc</kbd></div><span>返回模板列表</span></div>
+        </div>
+        <div class="shortcut-group">
+          <div class="shortcut-group-title">編輯頁面</div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>S</kbd></div><span>儲存模板</span></div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>N</kbd></div><span>新增模板</span></div>
+        </div>
+        <div class="shortcut-group">
+          <div class="shortcut-group-title">其他</div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Alt</kbd>+<kbd>A</kbd></div><span>開/關無障礙設定</span></div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>?</kbd></div><span>顯示此說明</span></div>
+          <div class="shortcut-row"><div class="shortcut-keys"><kbd>Esc</kbd></div><span>關閉任何開啟的面板</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

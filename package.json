@@ -1,5 +1,5 @@
 {
-  "name": "email-template-generator",
+  "name": "message-templator",
   "version": "1.0.0",
   "description": "訊息模板小工具",
   "scripts": {
