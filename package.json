@@ -1,0 +1,15 @@
+{
+  "name": "email-template-generator",
+  "version": "1.0.0",
+  "description": "訊息模板小工具",
+  "scripts": {
+    "setup": "pip install -r requirements.txt",
+    "start": "python app.py",
+    "build": "python build.py"
+  },
+  "author": "世新大學諮商中心",
+  "license": "MIT",
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}
