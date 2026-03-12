@@ -1,3 +1,63 @@
+/* === 啟動遮蔽屏 === */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #f5f5f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity .5s ease, transform .5s ease;
+}
+.splash-screen.fade-out {
+  opacity: 0;
+  transform: scale(1.05);
+  pointer-events: none;
+}
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.splash-icon {
+  width: 120px;
+  height: 120px;
+  animation: splashPulse 1.8s ease-in-out infinite;
+}
+@keyframes splashPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: .85; }
+}
+.splash-progress-text {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #5b8a72;
+  font-family: "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 1px;
+}
+
+/* === 同步狀態指示器 === */
+.sync-status {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 18px;
+  background: rgba(58, 58, 56, .9);
+  color: #fff;
+  border-radius: 6px;
+  font-size: .9rem;
+  font-family: "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+  z-index: 1100;
+  transition: opacity .4s ease;
+}
+.sync-status.fade-out {
+  opacity: 0;
+}
+.sync-status.hidden {
+  display: none;
+}
+
 /* === 基底 === */
 :root {
   --primary: #5b8a72;
