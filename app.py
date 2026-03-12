@@ -1,4 +1,4 @@
-"""MessageTemplator - Flask Backend"""
+"""MessageTemplator - Flask Backend (SHU Custom)"""
 import json
 import uuid
 import os
@@ -8,6 +8,7 @@ import webbrowser
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
+import requests as http_requests
 
 # 確定路徑（支援 PyInstaller 打包）
 if getattr(sys, 'frozen', False):
@@ -20,7 +21,11 @@ else:
 
 DATA_DIR = os.path.join(APP_DIR, 'data')
 TEMPLATES_FILE = os.path.join(DATA_DIR, 'templates.json')
+SYNC_META_FILE = os.path.join(DATA_DIR, 'sync_meta.json')
 STATIC_DIR = os.path.join(BUNDLE_DIR, 'static')
+
+# --- GAS 同步設定 ---
+GAS_URL = 'https://script.google.com/macros/s/AKfycbwd6ULWtDRsh8zSf52acbVYMk7QzY2MxU_vcJ7BG1wi5EYK1UngG4TKESvV4JiYMVYt/exec'  # 部署 GAS 後將 URL 貼在這裡
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 CORS(app)
@@ -43,6 +48,115 @@ def save_templates(templates):
     ensure_data_dir()
     with open(TEMPLATES_FILE, 'w', encoding='utf-8') as f:
         json.dump(templates, f, ensure_ascii=False, indent=2)
+
+
+# --- GAS 同步 ---
+def load_sync_meta():
+    if os.path.exists(SYNC_META_FILE):
+        with open(SYNC_META_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {'synced_versions': {}}
+
+
+def save_sync_meta(meta):
+    ensure_data_dir()
+    with open(SYNC_META_FILE, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+
+def fetch_remote_templates():
+    """從 GAS 取得遠端模板。"""
+    resp = http_requests.get(GAS_URL, timeout=15)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def push_remote_templates(templates):
+    """將模板推送到 GAS。"""
+    http_requests.post(
+        GAS_URL,
+        data=json.dumps(templates, ensure_ascii=False),
+        headers={'Content-Type': 'application/json'},
+        timeout=15,
+    )
+
+
+def sync_templates():
+    """
+    雙向同步本地與遠端模板。
+    衝突時：保留遠端版本為正本，本地版本存為副本（名稱加 MMDDHHSS衝突）。
+    """
+    if 'YOUR_GAS_WEB_APP_URL_HERE' in GAS_URL:
+        return {'success': False, 'error': 'GAS URL 尚未設定'}
+
+    try:
+        remote_list = fetch_remote_templates()
+    except Exception as e:
+        return {'success': False, 'error': f'無法連線到雲端：{e}'}
+
+    local_list = load_templates()
+    meta = load_sync_meta()
+    synced = meta.get('synced_versions', {})
+
+    local_map = {t['id']: t for t in local_list}
+    remote_map = {t['id']: t for t in remote_list}
+    all_ids = set(local_map.keys()) | set(remote_map.keys()) | set(synced.keys())
+
+    merged = []
+    conflicts = []
+
+    for tid in all_ids:
+        local = local_map.get(tid)
+        remote = remote_map.get(tid)
+        last_synced = synced.get(tid)
+
+        if local and not remote:
+            if last_synced:
+                pass  # 曾同步過但遠端已刪除 → 不保留
+            else:
+                merged.append(local)  # 本地新增 → 推到遠端
+        elif remote and not local:
+            if last_synced:
+                pass  # 曾同步過但本地已刪除 → 不保留
+            else:
+                merged.append(remote)  # 遠端新增 → 拉到本地
+        elif local and remote:
+            local_changed = local['updated_at'] != last_synced
+            remote_changed = remote['updated_at'] != last_synced
+
+            if local_changed and remote_changed:
+                # 衝突：保留遠端為正本，本地存為副本
+                merged.append(remote)
+                conflict_copy = dict(local)
+                conflict_copy['id'] = str(uuid.uuid4())
+                now = datetime.now()
+                conflict_copy['name'] = (
+                    local['name'] + now.strftime('%m%d%H%M') + '衝突'
+                )
+                conflict_copy['updated_at'] = now.isoformat()
+                merged.append(conflict_copy)
+                conflicts.append(conflict_copy['name'])
+            elif local_changed:
+                merged.append(local)
+            elif remote_changed:
+                merged.append(remote)
+            else:
+                merged.append(local)  # 兩邊都沒改
+
+    # 儲存到本地
+    save_templates(merged)
+
+    # 推送到遠端
+    try:
+        push_remote_templates(merged)
+    except Exception as e:
+        return {'success': False, 'error': f'上傳失敗：{e}'}
+
+    # 更新同步紀錄
+    new_synced = {t['id']: t['updated_at'] for t in merged}
+    save_sync_meta({'synced_versions': new_synced})
+
+    return {'success': True, 'conflicts': conflicts}
 
 
 # --- 靜態頁面 ---
@@ -114,6 +228,12 @@ def get_tags():
         for tag in t.get('tags', []):
             tags[tag] = tags.get(tag, 0) + 1
     return jsonify(tags)
+
+
+@app.route('/api/sync', methods=['POST'])
+def do_sync():
+    result = sync_templates()
+    return jsonify(result)
 
 
 # --- 關閉伺服器：瀏覽器視窗關閉時呼叫，含寬限期 ---

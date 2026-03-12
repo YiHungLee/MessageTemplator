@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm list:*)",
-      "Bash(netstat -ano | grep 5588 2>/dev/null || echo \"Port 5588 is free\")"
+      "Bash(netstat -ano | grep 5588 2>/dev/null || echo \"Port 5588 is free\")",
+      "Bash(find /d/記得刪除_Coding/MessageTemplator -type f \\\\\\( -name \"*.css\" -o -name \"*.txt\" -o -name \"*.md\" -o -name \"requirements*\" \\\\\\) 2>/dev/null | grep -v node_modules)"
     ]
   }
 }

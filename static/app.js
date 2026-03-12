@@ -12,12 +12,12 @@ let tagSuggestActiveIndex = -1;
 const API = '/api';
 
 /* === 初始化 === */
-document.addEventListener('DOMContentLoaded', () => {
-  loadTemplates();
+document.addEventListener('DOMContentLoaded', async () => {
   setupBodyDropZone();
   setupShutdownOnClose();
   loadA11ySettings();
   setupKeyboardShortcuts();
+  await splashInit();
 });
 
 /* === 關閉偵測：視窗關閉時通知伺服器結束 === */
@@ -37,6 +37,19 @@ async function loadTemplates() {
   const res = await fetch(`${API}/templates`);
   templates = await res.json();
   renderAll();
+}
+
+async function syncTemplates() {
+  try {
+    const res = await fetch(`${API}/sync`, { method: 'POST' });
+    const result = await res.json();
+    if (!result.success) return;
+    if (result.conflicts && result.conflicts.length > 0) {
+      showToast(`同步完成，${result.conflicts.length} 個衝突已存為副本`);
+    }
+  } catch {
+    // 離線或 GAS 未設定，略過
+  }
 }
 
 function renderAll() {
@@ -214,6 +227,7 @@ async function updateFromCompose() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...composeTemplate, body: restoredBody }),
   });
+  await syncTemplates();
   await loadTemplates();
   composeTemplate = templates.find(t => t.id === composeTemplate.id);
   composeEdited = false;
@@ -237,6 +251,7 @@ async function saveAsNewFromCompose() {
       body: restoredBody,
     }),
   });
+  await syncTemplates();
   await loadTemplates();
   composeEdited = false;
   hideComposeEditBtns();
@@ -558,6 +573,7 @@ async function saveTemplate() {
     showToast('模板已建立');
   }
 
+  await syncTemplates();
   await loadTemplates();
   document.getElementById('btn-delete-tpl').classList.remove('hidden');
 }
@@ -566,6 +582,7 @@ async function deleteTemplate() {
   if (!editingId) return;
   if (!confirm('確定要刪除此模板嗎？')) return;
   await fetch(`${API}/templates/${editingId}`, { method: 'DELETE' });
+  await syncTemplates();
   await loadTemplates();
   newTemplate();
   showToast('模板已刪除');

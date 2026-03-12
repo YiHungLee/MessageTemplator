@@ -9,6 +9,17 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <!-- 啟動遮蔽屏 -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+      <img src="/static/favicon.svg" class="splash-icon" alt="MessageTemplator">
+      <div class="splash-progress-text"><span id="splash-percent">0</span>%</div>
+    </div>
+  </div>
+
+  <!-- 同步狀態指示器 -->
+  <div id="sync-status" class="sync-status hidden"></div>
+
   <div class="header-wrap">
     <header>
       <h1>MessageTemplator</h1>
