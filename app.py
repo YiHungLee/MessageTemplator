@@ -3,7 +3,6 @@ import json
 import uuid
 import os
 import sys
-import signal
 import threading
 import webbrowser
 from datetime import datetime
@@ -117,18 +116,57 @@ def get_tags():
     return jsonify(tags)
 
 
-# --- 關閉伺服器：瀏覽器視窗關閉時呼叫 ---
+# --- 關閉伺服器：瀏覽器視窗關閉時呼叫，含寬限期 ---
+shutdown_timer = None
+SHUTDOWN_GRACE = 5  # 秒：寬限期內有新請求則取消關閉
+
+
+def cancel_shutdown():
+    """取消排定中的關閉計時器（代表瀏覽器只是重新整理）。"""
+    global shutdown_timer
+    if shutdown_timer is not None:
+        shutdown_timer.cancel()
+        shutdown_timer = None
+
+
+@app.before_request
+def on_request():
+    """任何請求進來都取消關閉計時器。"""
+    cancel_shutdown()
+
+
 @app.route('/api/shutdown', methods=['POST'])
 def shutdown():
-    print('瀏覽器視窗已關閉，伺服器自動結束。')
-    threading.Thread(target=lambda: os.kill(os.getpid(), signal.SIGINT), daemon=True).start()
+    global shutdown_timer
+    cancel_shutdown()
+    shutdown_timer = threading.Timer(SHUTDOWN_GRACE, _do_shutdown)
+    shutdown_timer.daemon = True
+    shutdown_timer.start()
     return jsonify({'ok': True})
+
+
+def _do_shutdown():
+    print('瀏覽器視窗已關閉（寬限期內無新請求），伺服器自動結束。')
+    os._exit(0)
+
+
+def is_port_in_use(port):
+    """檢查 port 是否已被占用。"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('127.0.0.1', port)) == 0
 
 
 if __name__ == '__main__':
     ensure_data_dir()
     port = 5588
-    print(f'MessageTemplator 啟動中... http://localhost:{port}')
+    url = f'http://localhost:{port}'
 
-    webbrowser.open(f'http://localhost:{port}')
+    if is_port_in_use(port):
+        print(f'偵測到伺服器已在執行中，直接開啟瀏覽器：{url}')
+        webbrowser.open(url)
+        sys.exit(0)
+
+    print(f'MessageTemplator 啟動中... {url}')
+    webbrowser.open(url)
     app.run(host='127.0.0.1', port=port, debug=False)

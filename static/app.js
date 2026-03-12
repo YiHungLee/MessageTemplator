@@ -22,9 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* === 關閉偵測：視窗關閉時通知伺服器結束 === */
 function setupShutdownOnClose() {
-  window.addEventListener('beforeunload', () => {
+  function notifyShutdown() {
+    // 雙重保險：sendBeacon + fetch keepalive
     navigator.sendBeacon(`${API}/shutdown`);
-  });
+    try {
+      fetch(`${API}/shutdown`, { method: 'POST', keepalive: true });
+    } catch {}
+  }
+  window.addEventListener('pagehide', notifyShutdown);
+  window.addEventListener('beforeunload', notifyShutdown);
 }
 
 async function loadTemplates() {
