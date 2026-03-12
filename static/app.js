@@ -36,20 +36,92 @@ function setupShutdownOnClose() {
 async function loadTemplates() {
   const res = await fetch(`${API}/templates`);
   templates = await res.json();
+  templates.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
   renderAll();
 }
 
-async function syncTemplates() {
+/* === 啟動遮蔽屏 === */
+const SPLASH_TIPS = [
+  'Tips: 你可以在右上角切換「使用」模式或「編輯」模式',
+  'Tips: 按下 Ctrl+S 可以快速儲存正在編輯的模板',
+  'Tips: 在使用頁面按「 / 」可以快速聚焦搜尋框',
+  'Tips: 變數組件可以直接拖曳到信件內容中插入',
+  'Tips: 按下 Ctrl+Enter 可以快速複製產生的信件內容',
+  'Tips: 標籤輸入時會自動建議已使用過的標籤',
+  'Tips: 在使用中的預覽畫面直接修改內容，可以更新模板或另存為新模板',
+  'Tips: 這個應用程式是由Yi-Hung Lee所製作',
+  'Tips: 右上角選項中可以調整字型大小與高對比模式',
+  'Tips: 模板會自動同步到雲端，多台電腦都能使用最新版本',
+];
+
+async function splashInit() {
+  const splash = document.getElementById('splash-screen');
+  const percentEl = document.getElementById('splash-percent');
+  document.getElementById('splash-tip').textContent =
+    SPLASH_TIPS[Math.floor(Math.random() * SPLASH_TIPS.length)];
+  let progress = 0;
+
+  // 模擬進度：快速爬到 30%，然後慢慢到 90%
+  const tick = setInterval(() => {
+    if (progress < 30) progress += 3;
+    else if (progress < 90) progress += 1;
+    percentEl.textContent = Math.min(progress, 99);
+  }, 60);
+
+  // 執行同步
   try {
     const res = await fetch(`${API}/sync`, { method: 'POST' });
     const result = await res.json();
-    if (!result.success) return;
     if (result.conflicts && result.conflicts.length > 0) {
       showToast(`同步完成，${result.conflicts.length} 個衝突已存為副本`);
     }
   } catch {
     // 離線或 GAS 未設定，略過
   }
+
+  // 同步完成 → 快速跑到 95%
+  clearInterval(tick);
+  progress = 95;
+  percentEl.textContent = progress;
+
+  // 載入模板
+  await loadTemplates();
+  percentEl.textContent = '100';
+
+  // 短暫停留後過場消失
+  await delay(300);
+  splash.classList.add('fade-out');
+  await delay(500);
+  splash.remove();
+}
+
+function delay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+/* === 儲存時同步狀態指示器 === */
+async function syncTemplatesWithStatus() {
+  const el = document.getElementById('sync-status');
+  el.textContent = '同步模板中...';
+  el.classList.remove('hidden', 'fade-out');
+
+  try {
+    const res = await fetch(`${API}/sync`, { method: 'POST' });
+    const result = await res.json();
+    if (result.conflicts && result.conflicts.length > 0) {
+      showToast(`${result.conflicts.length} 個衝突已存為副本`);
+    }
+    el.textContent = '同步完成!';
+  } catch {
+    el.textContent = '同步失敗（離線）';
+  }
+
+  // 1.5 秒後淡出
+  await delay(1500);
+  el.classList.add('fade-out');
+  await delay(400);
+  el.classList.add('hidden');
+  el.classList.remove('fade-out');
 }
 
 function renderAll() {
@@ -227,7 +299,7 @@ async function updateFromCompose() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...composeTemplate, body: restoredBody }),
   });
-  await syncTemplates();
+  await syncTemplatesWithStatus();
   await loadTemplates();
   composeTemplate = templates.find(t => t.id === composeTemplate.id);
   composeEdited = false;
@@ -251,7 +323,7 @@ async function saveAsNewFromCompose() {
       body: restoredBody,
     }),
   });
-  await syncTemplates();
+  await syncTemplatesWithStatus();
   await loadTemplates();
   composeEdited = false;
   hideComposeEditBtns();
@@ -573,7 +645,7 @@ async function saveTemplate() {
     showToast('模板已建立');
   }
 
-  await syncTemplates();
+  await syncTemplatesWithStatus();
   await loadTemplates();
   document.getElementById('btn-delete-tpl').classList.remove('hidden');
 }
@@ -582,7 +654,7 @@ async function deleteTemplate() {
   if (!editingId) return;
   if (!confirm('確定要刪除此模板嗎？')) return;
   await fetch(`${API}/templates/${editingId}`, { method: 'DELETE' });
-  await syncTemplates();
+  await syncTemplatesWithStatus();
   await loadTemplates();
   newTemplate();
   showToast('模板已刪除');

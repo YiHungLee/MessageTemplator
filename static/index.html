@@ -12,8 +12,10 @@
   <!-- 啟動遮蔽屏 -->
   <div id="splash-screen" class="splash-screen">
     <div class="splash-content">
+      <div class="splash-title">MessageTemplator_Shu</div>
       <img src="/static/favicon.svg" class="splash-icon" alt="MessageTemplator">
       <div class="splash-progress-text"><span id="splash-percent">0</span>%</div>
+      <div id="splash-tip" class="splash-tip"></div>
     </div>
   </div>
 
@@ -22,7 +24,7 @@
 
   <div class="header-wrap">
     <header>
-      <h1>MessageTemplator</h1>
+      <h1 onclick="switchView('generate')" style="cursor:pointer">MessageTemplator_Shu</h1>
       <div class="header-right">
         <div class="mode-toggle">
           <button class="toggle-btn active" data-view="generate" onclick="switchView('generate')">
